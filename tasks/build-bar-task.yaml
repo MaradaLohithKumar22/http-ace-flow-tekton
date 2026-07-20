@@ -1,0 +1,81 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: http-ace-flow-build-bar
+  namespace: cp4i-2
+spec:
+  params:
+    - name: nexus-url
+      type: string
+      default: "http://192.168.1.50:8081"
+
+    - name: nexus-repository
+      type: string
+      default: "http-ace-flow-bars"
+
+    - name: bar-name
+      type: string
+      default: "Http_Ace_flow_http.bar"
+
+  workspaces:
+    - name: source
+
+  results:
+    - name: bar-url
+      description: Uploaded BAR file URL
+
+  steps:
+    - name: build-and-upload
+      image: cp.icr.io/cp/appc/ace-server-prod:12.0.12-r13-20250616-170954
+      env:
+        - name: NEXUS_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: http-ace-flow-nexus-creds
+              key: username
+
+        - name: NEXUS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: http-ace-flow-nexus-creds
+              key: password
+
+      script: |
+        #!/bin/bash
+        set -euo pipefail
+
+        source /opt/ibm/ace-13/server/bin/mqsiprofile
+
+        WORKSPACE="$(workspaces.source.path)"
+        BAR_NAME="$(params.bar-name)"
+        OUTPUT_DIR="${WORKSPACE}/bar-output"
+
+        echo "Workspace: ${WORKSPACE}"
+        echo "BAR name: ${BAR_NAME}"
+
+        if [ ! -d "${WORKSPACE}/Http_Ace_flow" ]; then
+          echo "ERROR: Http_Ace_flow application folder was not found."
+          ls -la "${WORKSPACE}"
+          exit 1
+        fi
+
+        mkdir -p "${OUTPUT_DIR}"
+
+        ibmint package \
+          --input-path "${WORKSPACE}" \
+          --output-bar-file "${OUTPUT_DIR}/${BAR_NAME}" \
+          --project Http_Ace_flow
+
+        BAR_URL="$(params.nexus-url)/repository/$(params.nexus-repository)/${BAR_NAME}"
+
+        echo "Uploading BAR to ${BAR_URL}"
+
+        curl --fail --show-error \
+          --user "${NEXUS_USERNAME}:${NEXUS_PASSWORD}" \
+          --upload-file "${OUTPUT_DIR}/${BAR_NAME}" \
+          "${BAR_URL}"
+
+        printf "%s" "${BAR_URL}" > "$(results.bar-url.path)"
+
+        echo "BAR uploaded successfully."
+        echo "BAR URL: ${BAR_URL}"

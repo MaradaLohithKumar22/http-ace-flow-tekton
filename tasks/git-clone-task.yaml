@@ -1,0 +1,41 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: http-ace-flow-git-clone
+  namespace: cp4i-2
+spec:
+  params:
+    - name: repo-url
+      type: string
+    - name: revision
+      type: string
+      default: main
+
+  workspaces:
+    - name: output
+
+  steps:
+    - name: clone
+      image: alpine/git:latest
+      script: |
+        #!/bin/sh
+        set -eu
+
+        WORKDIR="$(workspaces.output.path)"
+        REVISION="$(params.revision)"
+
+        # GitHub webhook sends refs/heads/main.
+        REVISION="${REVISION#refs/heads/}"
+
+        echo "Repository: $(params.repo-url)"
+        echo "Revision: ${REVISION}"
+        echo "Workspace: ${WORKDIR}"
+
+        rm -rf "${WORKDIR:?}"/*
+        rm -rf "${WORKDIR}"/.[!.]* "${WORKDIR}"/..?* 2>/dev/null || true
+
+        git clone \
+          --branch "${REVISION}" \
+          --single-branch \
+          "$(params.repo-url)" \
+          "${WORKDIR}"

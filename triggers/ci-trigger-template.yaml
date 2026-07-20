@@ -1,0 +1,45 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: TriggerTemplate
+metadata:
+  name: http-ace-flow-ci-template
+  namespace: cp4i-2
+spec:
+  params:
+    - name: repo-url
+
+    - name: revision
+      default: main
+
+  resourcetemplates:
+    - apiVersion: tekton.dev/v1
+      kind: PipelineRun
+      metadata:
+        generateName: http-ace-flow-ci-run-
+        namespace: cp4i-2
+      spec:
+        pipelineRef:
+          name: http-ace-flow-ci-pipeline
+
+        taskRunTemplate:
+          serviceAccountName: pipeline
+
+        params:
+          - name: repo-url
+            value: $(tt.params.repo-url)
+
+          - name: revision
+            value: $(tt.params.revision)
+
+          - name: nexus-url
+            value: "http://192.168.1.50:8081"
+
+          - name: nexus-repository
+            value: "http-ace-flow-bars"
+
+          - name: bar-name
+            value: "Http_Ace_flow_http.bar"
+
+        workspaces:
+          - name: shared-workspace
+            persistentVolumeClaim:
+              claimName: http-ace-flow-pvc

@@ -1,0 +1,25 @@
+apiVersion: triggers.tekton.dev/v1beta1
+kind: EventListener
+metadata:
+  name: http-ace-flow-ci-listener
+  namespace: cp4i-2
+spec:
+  serviceAccountName: pipeline
+
+  triggers:
+    - name: github-push-trigger
+
+      interceptors:
+        - ref:
+            name: cel
+          params:
+            - name: filter
+              value: >
+                header.match('X-GitHub-Event', 'push') &&
+                body.ref == 'refs/heads/main'
+
+      bindings:
+        - ref: http-ace-flow-ci-binding
+
+      template:
+        ref: http-ace-flow-ci-template

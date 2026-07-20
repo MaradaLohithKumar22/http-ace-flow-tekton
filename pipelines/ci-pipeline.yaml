@@ -1,0 +1,64 @@
+apiVersion: tekton.dev/v1
+kind: Pipeline
+metadata:
+  name: http-ace-flow-ci-pipeline
+  namespace: cp4i-2
+spec:
+  params:
+    - name: repo-url
+      type: string
+
+    - name: revision
+      type: string
+      default: main
+
+    - name: nexus-url
+      type: string
+      default: "http://192.168.1.50:8081"
+
+    - name: nexus-repository
+      type: string
+      default: "http-ace-flow-bars"
+
+    - name: bar-name
+      type: string
+      default: "Http_Ace_flow_http.bar"
+
+  workspaces:
+    - name: shared-workspace
+
+  tasks:
+    - name: clone-repository
+      taskRef:
+        name: http-ace-flow-git-clone
+      params:
+        - name: repo-url
+          value: $(params.repo-url)
+
+        - name: revision
+          value: $(params.revision)
+      workspaces:
+        - name: output
+          workspace: shared-workspace
+
+    - name: build-and-upload-bar
+      runAfter:
+        - clone-repository
+      taskRef:
+        name: http-ace-flow-build-bar
+      params:
+        - name: nexus-url
+          value: $(params.nexus-url)
+
+        - name: nexus-repository
+          value: $(params.nexus-repository)
+
+        - name: bar-name
+          value: $(params.bar-name)
+      workspaces:
+        - name: source
+          workspace: shared-workspace
+
+  results:
+    - name: bar-url
+      value: $(tasks.build-and-upload-bar.results.bar-url)
